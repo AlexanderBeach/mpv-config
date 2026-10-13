@@ -16,6 +16,7 @@ local mp = require "mp"
 local msg = require "mp.msg"
 local options = require "mp.options"
 local utils = require "mp.utils"
+package.path = mp.command_native({ "expand-path", "~~/script-modules/?.lua;" }) .. package.path
 local fx = require "fx"
 local hist = require "histogram"
 local ui = require "ui"

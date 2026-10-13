@@ -13,11 +13,13 @@
 
 local mp = require 'mp'
 local utils = require 'mp.utils'
+package.path = mp.command_native({ "expand-path", "~~/script-modules/?.lua;" }) .. package.path
+local state = require "kit.state"
 
 local o = { min_position = 60, end_margin = 30, prompt_secs = 6 }
 require("mp.options").read_options(o, "resume-prompt")
 
-local DB = mp.command_native({ "expand-path", "~~state/resume-prompt.json" })
+local DB = "resume-prompt.json"
 local cur_path, last_pos = nil, nil
 local have_kb, timer = false, nil
 
@@ -34,29 +36,12 @@ local function key_for(path)
     return string.format("%x", h)
 end
 
-local function db_read()
-    local f = io.open(DB, "r"); if not f then return {} end
-    local s = f:read("*a"); f:close()
-    return utils.parse_json(s or "") or {}
-end
-
--- the state folder may not exist yet (e.g. ~/.local/state/mpv on a fresh Linux setup)
-local function ensure_state_dir()
-    local dir = utils.split_path(DB):gsub("[/\\]+$", "")
-    if utils.file_info(dir) then return end
-    local args = mp.get_property("platform") == "windows" and { "cmd.exe", "/d", "/c", "mkdir", dir } or { "mkdir", "-p", dir }
-    mp.command_native({ name = "subprocess", args = args, playback_only = false, capture_stderr = true })
-end
-
-local function db_write(t)
-    ensure_state_dir()
-    local f = io.open(DB, "w"); if f then f:write(utils.format_json(t)); f:close() end
-end
+local function db_read() return state.read(DB) or {} end
 
 local function remember(path, seconds)
     local db = db_read()
     db[key_for(path)] = seconds   -- seconds = nil clears the entry
-    db_write(db)
+    state.write(DB, db)
 end
 
 local function store_current(ev)

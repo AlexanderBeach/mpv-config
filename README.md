@@ -1,9 +1,9 @@
 # mpv config
 
-A ready-to-use configuration for the [mpv](https://mpv.io) media player: a live video-effects panel,
-a trimmed right-click menu, YouTube-style keys, a modern on-screen controller with seekbar
-thumbnails, and a few quality-of-life scripts. It comes with a setup wizard for Windows and an
-install script for Linux and macOS.
+A ready-to-use configuration for the [mpv](https://mpv.io) media player: live panels for video
+effects and subtitle style, a trimmed right-click menu, YouTube-style keys, a modern on-screen
+controller with seekbar thumbnails, and a few quality-of-life scripts. It comes with a setup
+wizard for Windows and an install script for Linux and macOS.
 
 ![The video effects panel docked beside the video](docs/images/effects-light.jpg)
 
@@ -17,6 +17,10 @@ install script for Linux and macOS.
 
   A live histogram shows the adjusted picture with the original behind it. Changes run on the GPU
   and apply instantly. They carry over from file to file and reset when mpv closes.
+- **Subtitle style panel** (<kbd>Ctrl</kbd>+<kbd>T</kbd>, or right-click › Subtitle › Style…): font,
+  size, bold and italic, text color, outline, a shadow or a box behind the text, and height. The
+  style is kept from one session to the next, and Reset goes back to `mpv.conf`. While the panel is
+  open, videos without subtitles show a sample line.
 - **Modern controls:** the [ModernZ](https://github.com/Samillion/ModernZ) on-screen controller,
   with seekbar thumbnails from [thumbfast](https://github.com/po5/thumbfast).
 - **A shorter right-click menu:** Open, Playlist, Chapters, Video, Audio, Subtitle, Speed, Window,
@@ -39,6 +43,8 @@ install script for Linux and macOS.
 
 ![Color and Curves sections of the panel](docs/images/effects-curves.jpg)
 
+![The subtitle style panel with yellow text on a box](docs/images/subtitle-style.jpg)
+
 ## Requirements
 
 - **mpv:**
@@ -48,8 +54,8 @@ install script for Linux and macOS.
     instead). Everything else works.
   - **Linux and macOS:** for the custom menu, use a nightly or git package of mpv.
 - **Video effects panel:** needs `vo=gpu-next`, which `mpv.conf` already sets.
-- **Platforms:** developed and tested on Windows 11. Linux and macOS support is written for and
-  checked with simulated tests, but hasn't been tried on real Linux or macOS machines yet.
+- **Platforms:** tested on Windows 11. Linux, BSD and macOS are supported through `install.sh`,
+  but not tested on those systems.
 - **File dialog on Linux:** needs `zenity` or `kdialog`, so it doesn't work in the Flatpak version
   of mpv.
 
@@ -76,8 +82,8 @@ The wizard lets you choose:
 - **Preferences:** the quality preset, and subtitle and audio languages.
 - **Subtitle font:** FiraGO, Atkinson Hyperlegible, Segoe UI, Calibri, Verdana or Arial, with a
   preview of each.
-- **Features:** ModernZ controls, seekbar thumbnails, the effects panel and the resume prompt, with
-  a picture of each one on and off.
+- **Features:** ModernZ controls, seekbar thumbnails, the resume prompt, and the video effects and
+  subtitle style panels, with a picture of each one.
 
 An existing mpv config is moved to a backup folder next to it (`mpv-backup-<date>`), never
 deleted. Everything is set up for your Windows user. Administrator rights are only requested if
@@ -155,14 +161,17 @@ The installers ask which font to use:
 | Noto Sans, DejaVu Sans, Liberation Sans, Cantarell | 36, 33, 34, 38 | common on Linux |
 | Helvetica Neue, Avenir Next, Lucida Grande | 34, 35, 34 | macOS |
 
-The sizes make each font about as wide as the others. They were measured for the Windows fonts and
-estimated for the Linux and macOS ones.
+The sizes make each font about as wide as the others: exact for the Windows fonts, approximate for
+the Linux and macOS ones.
 
 If the chosen font isn't installed, subtitles fall back to Segoe UI Semilight (Windows), then
-Erewhon if installed, then the system's default font. To change this, edit `sub-font=` in `mpv.conf`:
+Erewhon if installed, then the system's default font. To change this, edit `sub-font=` in
+`mpv.conf`:
 - each font can have its own size and weight in brackets, for example `FiraGO Book (37 regular)`;
 - font files you put in the config's `fonts` folder count as installed;
 - styled ASS/SSA subtitles keep their own fonts.
+
+The subtitle style panel switches between the installed fonts from this list at any time.
 
 ![Subtitles in FiraGO Book](docs/images/subtitles.jpg)
 
@@ -183,26 +192,30 @@ Erewhon if installed, then the system's default font. To change this, edit `sub-
 | <kbd>C</kbd> | Subtitles on / off |
 | <kbd>F1</kbd> | Best scalers on / off |
 | <kbd>Ctrl</kbd>+<kbd>E</kbd> | Video effects panel |
+| <kbd>Ctrl</kbd>+<kbd>T</kbd> | Subtitle style panel |
 | <kbd>Ctrl</kbd>+<kbd>O</kbd> | Open files |
 | Right-click | Menu |
 
 Everything else uses mpv's default keys.
 
-### In the effects panel
+### In the panels
 
-- **Sliders:** drag one, or click its value to type a number.
+- **Sliders:** drag one, or click its value to type a number. Double-click resets it.
 - **Curves:** click a curve to add a point, and drag a point off the graph to remove it.
-- **Sections:** each one has its own reset and on/off controls. The switch at the top turns all
-  effects on or off at once.
-- **Closing:** <kbd>Esc</kbd> closes the panel.
+- **Colors:** click a dot, or <kbd>+</kbd> to type a color such as `#FFE45C`.
+- **Sections:** each one has its own reset button. The switch at the top turns all effects, or the
+  whole subtitle style, off and on to compare.
+- **Closing:** <kbd>Esc</kbd> closes the panel. Only one panel is open at a time.
 
 ## Customizing
 
 - **`config/mpv.conf`:** player settings, each with a comment.
-- **`config/script-opts/*.conf`:** options for each script, such as the effects panel's width and
-  accent color, the update check, the yt-dlp updates, and ModernZ's layout.
-- **Scripted control of the effects:** `script-message-to video_effects ...`. The commands are
-  listed at the top of `config/scripts/video-effects/main.lua`.
+- **`config/script-opts/*.conf`:** options for each script, such as the panels' width and accent
+  color, the update check, the yt-dlp updates, and ModernZ's layout.
+- **Scripted control of the panels:** `script-message-to video_effects ...` and
+  `script-message-to sub_style ...`. The commands are listed at the top of
+  `config/scripts/video-effects/main.lua` and `config/scripts/sub-style.lua`.
+- **`config/script-modules/kit/`:** code the scripts share: the panel, font lookup and saved files.
 
 ## Updates and network use
 
@@ -230,9 +243,9 @@ Everything else uses mpv's default keys.
 
 ## Where personal data goes
 
-Resume positions and remembered volume are saved in mpv's state folder, not in the config:
-`%LOCALAPPDATA%\mpv` on Windows, `~/.local/state/mpv` on Linux, and the config folder on macOS. A
-portable mpv keeps them inside `portable_config`, and `.gitignore` excludes them.
+Resume positions, remembered volume and the subtitle style are saved in mpv's state folder, not in
+the config: `%LOCALAPPDATA%\mpv` on Windows, `~/.local/state/mpv` on Linux, and the config folder
+on macOS. A portable mpv keeps them inside `portable_config`, and `.gitignore` excludes them.
 
 ## Credits and licences
 

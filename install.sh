@@ -55,8 +55,8 @@ An existing mpv config folder is moved to a backup folder, which is never delete
       --sub-langs LIST      Subtitle languages in order of preference, such as eng,en or
                             pt-BR,pt. Use "" for none. Default: eng,en.
       --audio-langs LIST    Audio languages in order of preference. Default: none.
-      --without LIST        Leave out features, comma separated: thumbnails, effects, resume,
-                            modernz. Without modernz, mpv's own controller is used.
+      --without LIST        Leave out features, comma separated: thumbnails, effects, substyle,
+                            resume, modernz. Without modernz, mpv's own controller is used.
       --font KEY            Subtitle font: firago (default), atkinson, or an installed system font:
                             noto, dejavu, liberation, cantarell (Linux), helvetica, avenir, lucida (macOS).
       --fonts, --no-fonts   Download the chosen font when it is missing. Default: yes.
@@ -101,8 +101,8 @@ set_option() {
             ;;
         --without)
             RESULT=$(strip_spaces "$2")
-            printf '%s\n' "$RESULT" | grep -Eq '^((thumbnails|effects|resume|modernz)(,(thumbnails|effects|resume|modernz))*)?$' ||
-                usage_error "The features to leave out can be 'thumbnails', 'effects', 'resume' or 'modernz', separated by commas, but got '$2'."
+            printf '%s\n' "$RESULT" | grep -Eq '^((thumbnails|effects|substyle|resume|modernz)(,(thumbnails|effects|substyle|resume|modernz))*)?$' ||
+                usage_error "The features to leave out can be 'thumbnails', 'effects', 'substyle', 'resume' or 'modernz', separated by commas, but got '$2'."
             WITHOUT=$(printf '%s' "$RESULT" | tr ',' ' ')
             ;;
         --font) FONT=$(lower "$2") ;;
@@ -251,6 +251,7 @@ ask_choices() {
         ask_yes_no "ModernZ controller instead of mpv's own?" y || WITHOUT="$WITHOUT modernz"
         if ! in_list "$WITHOUT" modernz; then ask_yes_no "Seekbar thumbnails?" y || WITHOUT="$WITHOUT thumbnails"; fi
         ask_yes_no "Video effects panel (Ctrl+E)?" y || WITHOUT="$WITHOUT effects"
+        ask_yes_no "Subtitle style panel (Ctrl+T)?" y || WITHOUT="$WITHOUT substyle"
         ask_yes_no "Resume prompt for partly watched files?" y || WITHOUT="$WITHOUT resume"
     fi
     if ! in_list "$GIVEN" font; then
@@ -546,14 +547,15 @@ build_stage() {
     drop tools scripts/updater.lua script-opts/updater.conf scripts/open-file/dialog.ps1 scripts/open-file/hidden.js
     if in_list "$WITHOUT" thumbnails; then drop scripts/thumbfast.lua script-opts/thumbfast.conf; fi
     if in_list "$WITHOUT" effects; then drop scripts/video-effects script-opts/video_effects.conf; fi
+    if in_list "$WITHOUT" substyle; then drop scripts/sub-style.lua script-opts/sub_style.conf; fi
     if in_list "$WITHOUT" resume; then drop scripts/resume-prompt.lua; fi
     if in_list "$WITHOUT" modernz; then
         drop scripts/modernz.lua script-opts/modernz.conf fonts/modernz-icons.ttf
         rmdir "$STAGE_DIR/fonts" 2>/dev/null
     fi
     edit_mpv_conf
-    if [ "$OS_KIND" = Darwin ]; then    # On macOS mpv keeps its saved resume positions and volume in the config folder.
-        for _f in resume-prompt.json saved-state.json; do cp "$CONFIG_DIR/$_f" "$STAGE_DIR/" 2>/dev/null; done
+    if [ "$OS_KIND" = Darwin ]; then    # On macOS mpv keeps its saved resume positions, volume and subtitle style in the config folder.
+        for _f in resume-prompt.json saved-state.json sub-style.json; do cp "$CONFIG_DIR/$_f" "$STAGE_DIR/" 2>/dev/null; done
     fi
     install_ytdlp
 }
@@ -651,6 +653,7 @@ show_summary() {
     if in_list "$WITHOUT" modernz; then _features="mpv's own controller"; else _features="ModernZ controller"; fi
     in_list "$WITHOUT" thumbnails || _features="$_features, seekbar thumbnails"
     in_list "$WITHOUT" effects || _features="$_features, effects panel"
+    in_list "$WITHOUT" substyle || _features="$_features, subtitle style panel"
     in_list "$WITHOUT" resume || _features="$_features, resume prompt"
     _backup="none, there is no config yet"
     if has_config; then _backup="the current config moves to $CONFIG_DIR-backup-<date>-<time>"; fi

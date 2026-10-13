@@ -19,7 +19,7 @@
 .PARAMETER KeepFonts
     Keep the subtitle fonts the setup installed.
 .PARAMETER DeleteSavedData
-    Also delete what mpv remembers: resume positions and volume (and, with -Everything, mpv's cache).
+    Also delete what mpv remembers: resume positions, volume and the subtitle style (and, with -Everything, mpv's cache).
 #>
 [CmdletBinding()]
 param(
@@ -34,7 +34,7 @@ param(
 $ErrorActionPreference = 'Stop'
 $StateDir = Join-Path $env:LOCALAPPDATA 'mpv'
 $ManifestPath = Join-Path $StateDir 'install-manifest.json'
-$SavedData = 'resume-prompt.json', 'saved-state.json', 'updater-last-check', 'ytdlp-last-update'
+$SavedData = 'resume-prompt.json', 'saved-state.json', 'sub-style.json', 'updater-last-check', 'ytdlp-last-update'
 
 # Work from a copy in the temp folder: this script lives in the folder it may delete.
 if (-not $MpvDir) {
@@ -156,7 +156,7 @@ function Invoke-Uninstall([hashtable]$Info, [bool]$All, [bool]$Fonts, [bool]$Dat
             if ($Data) { Write-Log "Deleting mpv's saved data and cache: $StateDir"; Remove-Path $StateDir }
         } else {
             if ($Data) {
-                Write-Log 'Deleting the saved resume positions and volume'
+                Write-Log 'Deleting the saved resume positions, volume and subtitle style'
                 foreach ($f in $SavedData) { Remove-Item -LiteralPath (Join-Path $StateDir $f) -Force -ErrorAction SilentlyContinue }
             }
             Write-Log 'Removing the uninstaller (mpv stays)'
@@ -381,7 +381,7 @@ $UninstallXaml = @'
             </StackPanel>
           </Border>
           <CheckBox x:Name="CbFonts" Style="{StaticResource Check}" Content="Also remove the subtitle fonts the setup installed" IsChecked="True" Margin="2,0,0,12"/>
-          <CheckBox x:Name="CbData" Style="{StaticResource Check}" Content="Also delete saved resume positions and volume" Margin="2,0,0,0"/>
+          <CheckBox x:Name="CbData" Style="{StaticResource Check}" Content="Also delete saved resume positions, volume and subtitle style" Margin="2,0,0,0"/>
         </StackPanel>
         <Border x:Name="LogCard" Style="{StaticResource Group}" Padding="14,10" Visibility="Collapsed">
           <TextBox x:Name="Log" IsReadOnly="True" Background="Transparent" BorderThickness="0" Foreground="#C8C8C8" TextWrapping="Wrap"
@@ -424,7 +424,7 @@ if (-not $info.Fonts.Count) { $ui.CbFonts.IsChecked = $false; $ui.CbFonts.Visibi
 $state = @{ Confirmed = $false; Done = $false }
 
 $update = {
-    $ui.CbData.Content = if ($ui.RbAll.IsChecked) { "Also delete mpv's saved data and cache" } else { 'Also delete saved resume positions and volume' }
+    $ui.CbData.Content = if ($ui.RbAll.IsChecked) { "Also delete mpv's saved data and cache" } else { 'Also delete saved resume positions, volume and subtitle style' }
     $ui.BtnGo.Content = if ($ui.RbAll.IsChecked) { 'Remove everything' } else { 'Uninstall' }
     $ui.BtnGo.Style = $window.FindResource($(if ($ui.RbAll.IsChecked) { 'Danger' } else { 'Primary' }))
     $state.Confirmed = $false; $ui.Problem.Visibility = 'Collapsed'

@@ -30,7 +30,7 @@
 .PARAMETER AudioLanguages
     Preferred audio languages, e.g. "jpn,ja". Empty (default): the file's default track.
 .PARAMETER Without
-    Features to leave out: thumbnails, effects, resume, modernz.
+    Features to leave out: thumbnails, effects, substyle (the subtitle style panel), resume, modernz.
 .PARAMETER SubtitleFont
     firago (default), atkinson, segoe, calibri, verdana or arial.
 .PARAMETER Fonts
@@ -60,7 +60,7 @@ param(
     [ValidateSet('ultra', 'high', 'light')][string]$Preset = 'high',
     [string]$SubtitleLanguages = 'eng,en',
     [string]$AudioLanguages = '',
-    [ValidateSet('thumbnails', 'effects', 'resume', 'modernz')][string[]]$Without = @(),
+    [string[]]$Without = @(),
     [ValidateSet('firago', 'atkinson', 'segoe', 'calibri', 'verdana', 'arial')][string]$SubtitleFont = 'firago',
     [switch]$Fonts,
     [switch]$DefaultPlayer,
@@ -109,8 +109,15 @@ $SubtitleFonts = [ordered]@{
 $FeatureFiles = @{
     thumbnails = @('scripts\thumbfast.lua', 'script-opts\thumbfast.conf')
     effects    = @('scripts\video-effects', 'script-opts\video_effects.conf')
+    substyle   = @('scripts\sub-style.lua', 'script-opts\sub_style.conf')
     resume     = @('scripts\resume-prompt.lua')
     modernz    = @('scripts\modernz.lua', 'script-opts\modernz.conf', 'fonts\modernz-icons.ttf')
+}
+
+# -Without also takes "effects,resume" as one argument, which is how powershell.exe -File passes it.
+$Without = @($Without -split ',' | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+foreach ($w in $Without) {
+    if (-not $FeatureFiles.ContainsKey($w)) { throw "-Without: '$w' is not one of $(($FeatureFiles.Keys | Sort-Object) -join ', ')" }
 }
 
 #region Helpers -----------------------------------------------------------------------------------
@@ -751,7 +758,7 @@ $WizardXaml = @'
           <!-- 1: welcome -->
           <StackPanel x:Name="Page0">
             <TextBlock TextWrapping="Wrap" Margin="0,0,0,16" LineHeight="21"
-                       Text="This sets up mpv with a live video effects panel, modern controls with seekbar thumbnails, a shorter right-click menu and YouTube-style keys."/>
+                       Text="This sets up mpv with live video effects and subtitle style panels, modern controls with seekbar thumbnails, a shorter right-click menu and YouTube-style keys."/>
             <Border Style="{StaticResource Group}">
               <StackPanel>
                 <Grid Margin="16,12"><Grid.ColumnDefinitions><ColumnDefinition Width="34"/><ColumnDefinition/></Grid.ColumnDefinitions>
@@ -890,33 +897,40 @@ $WizardXaml = @'
           </StackPanel>
 
           <!-- 6: features, each picture shows it on or off -->
-          <UniformGrid x:Name="Page5" Columns="2" VerticalAlignment="Top" Margin="0,0,-12,0" Visibility="Collapsed">
-            <Border Style="{StaticResource Group}" Padding="9" Margin="0,0,12,12">
+          <UniformGrid x:Name="Page5" Columns="3" VerticalAlignment="Top" Margin="0,0,-10,0" Visibility="Collapsed">
+            <Border Style="{StaticResource Group}" Padding="8" Margin="0,0,10,10">
               <StackPanel>
-                <Grid><Border x:Name="PicModernz" Height="140" CornerRadius="5"/>
+                <Grid><Border x:Name="PicModernz" Height="95" CornerRadius="5"/>
                   <Border Style="{StaticResource Caption}"><TextBlock x:Name="CapModernz"/></Border></Grid>
-                <CheckBox x:Name="CbModernz" Style="{StaticResource Check}" Content="Modern controls" IsChecked="True" Margin="2,9,0,0"/>
+                <CheckBox x:Name="CbModernz" Style="{StaticResource Check}" Content="Modern controls" IsChecked="True" Margin="2,8,0,0"/>
               </StackPanel>
             </Border>
-            <Border Style="{StaticResource Group}" Padding="9" Margin="0,0,12,12">
+            <Border Style="{StaticResource Group}" Padding="8" Margin="0,0,10,10">
               <StackPanel>
-                <Grid><Border x:Name="PicThumbs" Height="140" CornerRadius="5"/>
+                <Grid><Border x:Name="PicThumbs" Height="95" CornerRadius="5"/>
                   <Border Style="{StaticResource Caption}"><TextBlock x:Name="CapThumbs"/></Border></Grid>
-                <CheckBox x:Name="CbThumbs" Style="{StaticResource Check}" Content="Seekbar thumbnails" IsChecked="True" Margin="2,9,0,0"/>
+                <CheckBox x:Name="CbThumbs" Style="{StaticResource Check}" Content="Seekbar thumbnails" IsChecked="True" Margin="2,8,0,0"/>
               </StackPanel>
             </Border>
-            <Border Style="{StaticResource Group}" Padding="9" Margin="0,0,12,0">
+            <Border Style="{StaticResource Group}" Padding="8" Margin="0,0,10,10">
               <StackPanel>
-                <Grid><Border x:Name="PicEffects" Height="140" CornerRadius="5"/>
-                  <Border Style="{StaticResource Caption}" VerticalAlignment="Bottom"><TextBlock x:Name="CapEffects"/></Border></Grid>
-                <CheckBox x:Name="CbEffects" Style="{StaticResource Check}" Content="Video effects panel" IsChecked="True" Margin="2,9,0,0"/>
-              </StackPanel>
-            </Border>
-            <Border Style="{StaticResource Group}" Padding="9" Margin="0,0,12,0">
-              <StackPanel>
-                <Grid><Border x:Name="PicResume" Height="140" CornerRadius="5"/>
+                <Grid><Border x:Name="PicResume" Height="95" CornerRadius="5"/>
                   <Border Style="{StaticResource Caption}" VerticalAlignment="Bottom" HorizontalAlignment="Right"><TextBlock x:Name="CapResume"/></Border></Grid>
-                <CheckBox x:Name="CbResume" Style="{StaticResource Check}" Content="Resume prompt" IsChecked="True" Margin="2,9,0,0"/>
+                <CheckBox x:Name="CbResume" Style="{StaticResource Check}" Content="Resume prompt" IsChecked="True" Margin="2,8,0,0"/>
+              </StackPanel>
+            </Border>
+            <Border Style="{StaticResource Group}" Padding="8" Margin="0,0,10,10">
+              <StackPanel>
+                <Grid><Border x:Name="PicEffects" Height="95" CornerRadius="5"/>
+                  <Border Style="{StaticResource Caption}" VerticalAlignment="Bottom"><TextBlock x:Name="CapEffects"/></Border></Grid>
+                <CheckBox x:Name="CbEffects" Style="{StaticResource Check}" Content="Video effects panel" IsChecked="True" Margin="2,8,0,0"/>
+              </StackPanel>
+            </Border>
+            <Border Style="{StaticResource Group}" Padding="8" Margin="0,0,10,10">
+              <StackPanel>
+                <Grid><Border x:Name="PicSubStyle" Height="95" CornerRadius="5"/>
+                  <Border Style="{StaticResource Caption}"><TextBlock x:Name="CapSubStyle"/></Border></Grid>
+                <CheckBox x:Name="CbSubStyle" Style="{StaticResource Check}" Content="Subtitle style panel" IsChecked="True" Margin="2,8,0,0"/>
               </StackPanel>
             </Border>
           </UniformGrid>
@@ -982,8 +996,8 @@ function Show-Wizard {
                       'WelcomeMpv', 'WelcomeMpvNote', 'WelcomeConfig', 'WelcomeConfigNote', 'MpvFoundPanel', 'MpvFoundPath', 'MpvFoundVersion',
                       'MpvMissingPanel', 'CbInstallMpv', 'TbMpvDir', 'BtnBrowse', 'CbWeb', 'CbDefault',
                       'CbStart', 'CbDesktop', 'CbFolder', 'CbUpdates', 'RbUltra', 'RbHigh', 'RbLight', 'TbSubs', 'TbAudio', 'PresetNote',
-                      'FontChoices', 'FontPreview', 'FontNote', 'CbModernz', 'CbThumbs', 'CbEffects', 'CbResume',
-                      'PicModernz', 'PicThumbs', 'PicEffects', 'PicResume', 'CapModernz', 'CapThumbs', 'CapEffects', 'CapResume',
+                      'FontChoices', 'FontPreview', 'FontNote', 'CbModernz', 'CbThumbs', 'CbEffects', 'CbResume', 'CbSubStyle',
+                      'PicModernz', 'PicThumbs', 'PicEffects', 'PicResume', 'PicSubStyle', 'CapModernz', 'CapThumbs', 'CapEffects', 'CapResume', 'CapSubStyle',
                       'Summary', 'Progress', 'Log', 'CbOpen', 'Problem', 'ProblemText', 'BtnCancel', 'BtnBack', 'BtnNext') {
         $ui[$name] = $window.FindName($name)
     }
@@ -1059,10 +1073,11 @@ function Show-Wizard {
 
     # Features: ModernZ and thumbnails show the alternative when off; the others fade out
     $features = @(
-        @{ Check = 'CbModernz'; Pic = 'PicModernz'; Cap = 'CapModernz'; On = 'modernz-on'; Off = 'modernz-off'; OnText = 'ModernZ'; OffText = "mpv's own controls" },
-        @{ Check = 'CbThumbs'; Pic = 'PicThumbs'; Cap = 'CapThumbs'; On = 'thumbs-on'; Off = 'thumbs-off'; OnText = 'A preview while you point at the seekbar'; OffText = 'Only the time' },
-        @{ Check = 'CbEffects'; Pic = 'PicEffects'; Cap = 'CapEffects'; On = 'effects'; OnText = 'Ctrl+E or the right-click menu'; OffText = 'Left out' },
-        @{ Check = 'CbResume'; Pic = 'PicResume'; Cap = 'CapResume'; On = 'resume'; OnText = 'When you open a video again'; OffText = 'Videos start from the beginning' })
+        @{ Check = 'CbModernz'; Pic = 'PicModernz'; Cap = 'CapModernz'; On = 'modernz-on'; Off = 'modernz-off'; OnText = 'ModernZ'; OffText = "mpv's own" },
+        @{ Check = 'CbThumbs'; Pic = 'PicThumbs'; Cap = 'CapThumbs'; On = 'thumbs-on'; Off = 'thumbs-off'; OnText = 'Preview on hover'; OffText = 'Time only' },
+        @{ Check = 'CbEffects'; Pic = 'PicEffects'; Cap = 'CapEffects'; On = 'effects'; OnText = 'Ctrl+E'; OffText = 'Left out' },
+        @{ Check = 'CbSubStyle'; Pic = 'PicSubStyle'; Cap = 'CapSubStyle'; On = 'substyle'; OnText = 'Ctrl+T'; OffText = 'Left out' },
+        @{ Check = 'CbResume'; Pic = 'PicResume'; Cap = 'CapResume'; On = 'resume'; OnText = 'Asks to resume'; OffText = 'Starts over' })
     $showFeatures = {
         $ui.CbThumbs.IsEnabled = [bool]$ui.CbModernz.IsChecked   # mpv's own controls can't show thumbnails
         if (-not $ui.CbModernz.IsChecked) { $ui.CbThumbs.IsChecked = $false }
@@ -1073,7 +1088,7 @@ function Show-Wizard {
             $ui[$f.Pic].Opacity = $(if ($on -or $f.Off) { 1 } else { 0.35 })
             $ui[$f.Cap].Text = if ($on) { $f.OnText } else { $f.OffText }
         }
-        if (-not $ui.CbModernz.IsChecked) { $ui.CapThumbs.Text = 'Needs the modern controls' }
+        if (-not $ui.CbModernz.IsChecked) { $ui.CapThumbs.Text = 'Needs ModernZ' }
     }
     foreach ($f in $features) { $ui[$f.Check].Add_Checked({ & $showFeatures }); $ui[$f.Check].Add_Unchecked({ & $showFeatures }) }
     & $showFeatures
@@ -1141,6 +1156,7 @@ function Show-Wizard {
         if (-not $ui.CbModernz.IsChecked) { $plan.Without += 'modernz' }
         if (-not $ui.CbThumbs.IsChecked) { $plan.Without += 'thumbnails' }
         if (-not $ui.CbEffects.IsChecked) { $plan.Without += 'effects' }
+        if (-not $ui.CbSubStyle.IsChecked) { $plan.Without += 'substyle' }
         if (-not $ui.CbResume.IsChecked) { $plan.Without += 'resume' }
     }
 
@@ -1154,7 +1170,7 @@ function Show-Wizard {
         $lines += "Picture quality: $($plan.Preset)"
         $lines += "Subtitle languages: $(if ($plan.SubLangs) { $plan.SubLangs } else { 'none' });  audio: $(if ($plan.AudioLangs) { $plan.AudioLangs } else { 'the file''s default' })"
         $lines += "Subtitle font: $($SubtitleFonts[$plan.SubFont].Name)$(if ($plan.Fonts) { ' (download and install it)' })"
-        $featureNames = @{ modernz = 'modern controls'; thumbnails = 'seekbar thumbnails'; effects = 'video effects panel'; resume = 'resume prompt' }
+        $featureNames = @{ modernz = 'modern controls'; thumbnails = 'seekbar thumbnails'; effects = 'video effects panel'; substyle = 'subtitle style panel'; resume = 'resume prompt' }
         if ($plan.Without.Count) { $lines += "Leave out: $(($plan.Without | ForEach-Object { $featureNames[$_] }) -join ', ')" }
         if ($plan.WebVideos) { $lines += 'Install yt-dlp for web videos' }
         if ($plan.DefaultPlayer) { $lines += 'Register mpv as a media player and open Default apps' }
@@ -1247,7 +1263,7 @@ function Show-Wizard {
 
 #endregion
 
-# Loaded with ". install.ps1" (the setup window's background worker, or tests): define only.
+# Loaded with ". install.ps1" (as the setup window's background worker does): define only.
 if ($MyInvocation.InvocationName -eq '.') { return }
 
 if ($Silent) {
