@@ -3,9 +3,10 @@
 -- MODIFIED (2026) for this mpv config, from ModernZ main at commit 579897e (whose header reads
 -- v0.3.3). Not an official ModernZ release. Changes: button icon sizes 28/24/24 -> 26/26/26,
 -- hide_volume_bar_trigger 1150 -> 250, window-control icons \fs25 -> \fs26, and in the default
--- layout a longer, thicker, always-visible volume bar (its handle is full size in every layout),
--- and the download button runs the yt-dlp that mpv found (user-data/mpv/ytdl/path). Still
--- licensed under the GNU LGPL v2.1, like the original.
+-- layout a longer, thicker, always-visible volume bar (its handle is full size in every layout)
+-- that never overlaps the center buttons (when space runs out the time codes move up to the title
+-- line, then the bar shortens, then it hides), and the download button runs the yt-dlp that mpv
+-- found (user-data/mpv/ytdl/path). Still licensed under the GNU LGPL v2.1, like the original.
 --
 -- This script is a derivative of the original mpv-osc-modern by maoiscat
 -- and subsequent forks:
@@ -2143,6 +2144,60 @@ end
 
 -- Default layout
 layouts["default"] = function ()
+    local audio_track = state.audio_track_count > 0
+    local subtitle_track = state.sub_track_count > 0
+    local chapter_skip_buttons = user_opts.chapter_skip_buttons and type(state.chapter_list) == "table" and next(state.chapter_list)
+    local playlist_button = user_opts.playlist_button and (not user_opts.hide_empty_playlist_button or state.playlist_count > 1)
+
+    local offset = user_opts.jump_buttons and 60 or 0
+    local outeroffset = (chapter_skip_buttons and 0 or 100) + (user_opts.jump_buttons and 0 or 100)
+    local narrow_win = osc_param.playresx < (
+        user_opts.portrait_window_trigger
+        - outeroffset
+        - (playlist_button and 0 or 100)
+        - (subtitle_track and 0 or 100)
+        - (audio_track and 0 or 100)
+    )
+
+    -- left side buttons: {element, shown, minimum window width}
+    local left_buttons = {
+        {"playlist", playlist_button, 550},
+        {"audio_track", audio_track and user_opts.audio_tracks_button, 650},
+        {"sub_track", subtitle_track and user_opts.subtitles_button, 750},
+    }
+
+    -- Keep the left side (buttons, volume bar, time codes) clear of the center buttons. When the
+    -- time codes don't fit beside the volume bar they move up to the title line, as in narrow
+    -- windows. When the bar itself doesn't fit it is shortened, and hidden below vol_bar_min_w.
+    local vol_bar_w, vol_bar_min_w = 100, 40
+    local playlist_prev_vis = user_opts.track_nextprev_buttons
+        and (state.playlist_count > 1 or contains(user_opts.buttons_always_active, "playlist_prev"))
+        and osc_param.playresx >= 500 - outeroffset
+    local chapter_prev_vis = chapter_skip_buttons and osc_param.playresx >= 400 - outeroffset
+    local center_half_w = playlist_prev_vis and (60 + (chapter_skip_buttons and 60 or 0) + offset + 15)
+        or chapter_prev_vis and (60 + offset + 15)
+        or user_opts.jump_buttons and (60 + 15)
+        or 22.5
+    local left_limit = osc_param.playresx / 2 - center_half_w - 15 -- 15px gap before the center buttons
+
+    local next_left_x = 37 -- center of the next left side button
+    for _, b in ipairs(left_buttons) do
+        if b[2] and osc_param.playresx >= b[3] then next_left_x = next_left_x + 45 end
+    end
+    local volume_bar = audio_track and user_opts.volume_control
+    local vol_bar_x = next_left_x + 20 -- after the volume button
+    local vol_vis = volume_bar and osc_param.playresx >= user_opts.hide_volume_bar_trigger - outeroffset
+    if vol_vis then
+        vol_bar_w = math.min(vol_bar_w, left_limit - vol_bar_x)
+        vol_vis = vol_bar_w >= vol_bar_min_w
+    end
+
+    local time_codes_width = get_time_codes_width()
+    local time_codes_x = not volume_bar and (next_left_x - 12)
+        or vol_vis and (vol_bar_x + vol_bar_w + 20)
+        or (vol_bar_x + 8)
+    narrow_win = narrow_win or (time_codes_x + time_codes_width > left_limit)
+
     local no_title = not user_opts.show_title
     local no_chapter = not user_opts.show_chapter_title
     local chapter_index = user_opts.show_chapter_title and (state.chapter or -1) >= 0
@@ -2156,13 +2211,8 @@ layouts["default"] = function ()
 
     if title_and_chapter_h_with_offset == 0 then
         -- add some top padding if both title and chapter aren't displayed
-        local ch_skip = user_opts.chapter_skip_buttons and type(state.chapter_list) == "table" and next(state.chapter_list)
-        local outer = (ch_skip and 0 or 100) + (user_opts.jump_buttons and 0 or 100)
-        local timecodes_above = osc_param.playresx < (user_opts.portrait_window_trigger - outer
-            - (user_opts.playlist_button and (not user_opts.hide_empty_playlist_button or state.playlist_count > 1) and 0 or 100)
-            - (state.sub_track_count > 0 and 0 or 100)
-            - (state.audio_track_count > 0 and 0 or 100))
-        title_and_chapter_h_with_offset = timecodes_above
+        -- (narrow_win puts the time codes above the seekbar)
+        title_and_chapter_h_with_offset = narrow_win
             and math.max(user_opts.osc_height * 0.2, user_opts.time_codes_offset + user_opts.title_offset + user_opts.time_font_size)
             or user_opts.osc_height * 0.2
     end
@@ -2228,23 +2278,6 @@ layouts["default"] = function ()
         lo.slider.tooltip_an = 0
     end
 
-    local audio_track = state.audio_track_count > 0
-    local subtitle_track = state.sub_track_count > 0
-    local chapter_skip_buttons = user_opts.chapter_skip_buttons and type(state.chapter_list) == "table" and next(state.chapter_list)
-    local ontop_button = user_opts.ontop_button and not (window_controls_enabled() and user_opts.ontop_in_topbar and state.ontop)
-    local playlist_button = user_opts.playlist_button and (not user_opts.hide_empty_playlist_button or state.playlist_count > 1)
-
-    local offset = user_opts.jump_buttons and 60 or 0
-    local outeroffset = (chapter_skip_buttons and 0 or 100) + (user_opts.jump_buttons and 0 or 100)
-    local narrow_win = osc_param.playresx < (
-        user_opts.portrait_window_trigger
-        - outeroffset
-        - (playlist_button and 0 or 100)
-        - (subtitle_track and 0 or 100)
-        - (audio_track and 0 or 100)
-    )
-
-    local time_codes_width = get_time_codes_width()
     local chapter_title_y, title_y
     if user_opts.chapter_above_title then
         title_y = user_opts.osc_height + title_offset
@@ -2292,21 +2325,17 @@ layouts["default"] = function ()
         end
     end
 
-    if playlist_button then left_side_button("playlist", 550) end
-    if audio_track and user_opts.audio_tracks_button then left_side_button("audio_track", 650) end
-    if subtitle_track and user_opts.subtitles_button then left_side_button("sub_track", 750) end
+    for _, b in ipairs(left_buttons) do
+        if b[2] then left_side_button(b[1], b[3]) end
+    end
 
-    if audio_track and user_opts.volume_control then
+    if volume_bar then
         -- volume button
         left_side_button("vol_ctrl", 0)
-        start_x = start_x - 25 -- vol_ctrl uses a narrower step (+20 not +45)
 
-        -- volume bar
-        local vol_bar_x = start_x   -- bar's left edge
-        local vol_bar_w = 100       -- bar length: drives geometry, element spacing, AND the hover box
+        -- volume bar (vol_bar_x, vol_bar_w and vol_vis are worked out at the top of the layout)
         local vol_bar_h = 12        -- bar thickness; also sets the handle (circle) size via handle_ratio
         local osc_mid  = refY - (user_opts.osc_height / 2)
-        local vol_vis  = (osc_param.playresx >= user_opts.hide_volume_bar_trigger - outeroffset)
 
         ne = new_element("volumebarbg", "box")
         ne.visible = vol_vis
@@ -2326,19 +2355,13 @@ layouts["default"] = function ()
         lo.slider.radius = user_opts.slider_rounded_corners and 2 or 0
         lo.slider.tooltip_an = 2
 
-        start_x = vol_bar_x + vol_bar_w + 20   -- bar + 20px gap to the next element
         local icon_left = vol_bar_x - 32       -- icon center sits at vol_bar_x - 20, half-width 12
         elements["vol_ctrl"].hover_box = vol_vis
             and {x1 = icon_left, y1 = osc_mid - 14, x2 = vol_bar_x + vol_bar_w, y2 = osc_mid + 14}
             or nil
     end
 
-    -- time codes
-    local auto_hide_volbar = (audio_track and user_opts.volume_control) and osc_param.playresx < (user_opts.hide_volume_bar_trigger - outeroffset)
-    local time_codes_x = start_x
-        - (auto_hide_volbar and 67 or 0) -- window width with audio track and elements
-        - (audio_track and not user_opts.volume_control and 12 or 0) -- audio track with no elements
-        - (not audio_track and 12 or 0) -- remove excess space
+    -- time codes (time_codes_x is worked out at the top of the layout)
     local time_codes_y = user_opts.time_codes_offset + (user_opts.osc_height / 2)
     if narrow_win then
         -- try to vertically align time codes to the baseline of title/chapter
@@ -2362,14 +2385,14 @@ layouts["default"] = function ()
 
     -- center buttons
     if user_opts.track_nextprev_buttons then
-        elements["playlist_prev"].visible = (state.playlist_count > 1 or contains(user_opts.buttons_always_active, "playlist_prev")) and (osc_param.playresx >= 500 - outeroffset)
+        elements["playlist_prev"].visible = playlist_prev_vis
         lo = add_layout("playlist_prev")
         lo.geometry = {x = refX - (60 + (chapter_skip_buttons and 60 or 0)) - offset, y = refY - (user_opts.osc_height / 2), an = 5, w = 30, h = 24}
         lo.style = osc_styles.control_2
     end
 
     if chapter_skip_buttons then
-        elements["chapter_prev"].visible = osc_param.playresx >= 400 - outeroffset
+        elements["chapter_prev"].visible = chapter_prev_vis
         lo = add_layout("chapter_prev")
         lo.geometry = {x = refX - 60 - offset, y = refY - (user_opts.osc_height / 2), an = 5, w = 30, h = 24}
         lo.style = osc_styles.control_2
